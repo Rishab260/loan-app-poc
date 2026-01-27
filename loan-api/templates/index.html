@@ -1,75 +1,128 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
+  <meta charset="UTF-8" />
   <title>Loan Request</title>
-  <style>
-    body {
-      font-family: Arial, sans-serif;
-    }
 
-    #toast {
-      position: fixed;
-      bottom: 20px;
-      right: 20px;
-      background: #333;
-      color: #fff;
-      padding: 16px;
-      border-radius: 6px;
-      display: none;
-    }
-
-    #loanId {
-      margin-top: 12px;
-      font-weight: bold;
-      color: #333;
-    }
-  </style>
+  <!-- Tailwind CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
 </head>
-<body>
 
-<h2>Loan Request</h2>
+<body class="bg-gray-100 min-h-screen flex items-center justify-center">
 
-<form id="loanForm">
-  <input name="name" placeholder="Name" required><br/><br/>
-  <input name="address" placeholder="Address" required><br/><br/>
-  <select name="gender">
-    <option>Male</option>
-    <option>Female</option>
-  </select><br/><br/>
-  <input name="amount" placeholder="Amount" required><br/><br/>
-  <button type="submit">Submit</button>
-</form>
+  <div class="bg-white shadow-lg rounded-lg p-6 w-full max-w-md">
+    <h2 class="text-xl font-semibold mb-4">Loan Request</h2>
 
-<p id="loanId"></p>
+    <form id="loanForm" class="space-y-3">
+      <input
+        name="name"
+        placeholder="Name"
+        required
+        class="w-full border rounded px-3 py-2 focus:outline-none focus:ring"
+      />
 
-<div id="toast"></div>
+      <input
+        name="address"
+        placeholder="Address"
+        required
+        class="w-full border rounded px-3 py-2 focus:outline-none focus:ring"
+      />
+
+      <select
+        name="gender"
+        required
+        class="w-full border rounded px-3 py-2 focus:outline-none focus:ring"
+      >
+        <option value="male">Male</option>
+        <option value="female">Female</option>
+      </select>
+
+      <input
+        name="amount"
+        type="number"
+        min="1"
+        placeholder="Amount"
+        required
+        class="w-full border rounded px-3 py-2 focus:outline-none focus:ring"
+      />
+
+      <button
+        type="submit"
+        class="w-full bg-blue-600 text-white py-2 rounded hover:bg-blue-700"
+      >
+        Submit
+      </button>
+    </form>
+
+    <p id="loanId" class="mt-4 text-sm font-medium text-gray-700"></p>
+  </div>
+
+  <!-- Toast -->
+  <div
+    id="toast"
+    class="fixed bottom-5 right-5 hidden px-4 py-3 rounded text-white shadow-lg"
+  ></div>
 
 <script>
 const form = document.getElementById("loanForm");
 const toast = document.getElementById("toast");
 const loanIdEl = document.getElementById("loanId");
 
+let eventSource = null;
+
+function showToast(message, type = "info") {
+  const colors = {
+    info: "bg-gray-800",
+    success: "bg-green-600",
+    error: "bg-red-600"
+  };
+
+  toast.className = `fixed bottom-5 right-5 px-4 py-3 rounded text-white shadow-lg ${colors[type]}`;
+  toast.innerText = message;
+  toast.style.display = "block";
+
+  setTimeout(() => {
+    toast.style.display = "none";
+  }, 4000);
+}
+
 form.onsubmit = async (e) => {
   e.preventDefault();
 
-  const response = await fetch("/submit", {
+  // close previous SSE
+  if (eventSource) {
+    eventSource.close();
+  }
+
+  const res = await fetch("/submit", {
     method: "POST",
     body: new FormData(form)
   });
 
-  const data = await response.json();
+  if (!res.ok) {
+    showToast("Submission failed", "error");
+    return;
+  }
 
-  // Show loan ID immediately
+  const data = await res.json();
   loanIdEl.innerText = `Loan ID: ${data.id}`;
 
-  // Open SSE connection for THIS loan only
-  const eventSource = new EventSource(`/events/${data.id}`);
+  eventSource = new EventSource(`/events/${data.id}`);
 
   eventSource.onmessage = (event) => {
     const msg = JSON.parse(event.data);
 
-    toast.innerText = `Loan ${msg.status.toUpperCase()}`;
-    toast.style.display = "block";
+    showToast(`Loan ${msg.status.toUpperCase()}`,
+      msg.status === "approved" ? "success" : "info"
+    );
+
+    if (msg.status === "approved" || msg.status === "rejected") {
+      eventSource.close();
+    }
+  };
+
+  eventSource.onerror = () => {
+    showToast("Connection lost", "error");
   };
 };
 </script>
