@@ -1,0 +1,78 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Loan Request</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+    }
+
+    #toast {
+      position: fixed;
+      bottom: 20px;
+      right: 20px;
+      background: #333;
+      color: #fff;
+      padding: 16px;
+      border-radius: 6px;
+      display: none;
+    }
+
+    #loanId {
+      margin-top: 12px;
+      font-weight: bold;
+      color: #333;
+    }
+  </style>
+</head>
+<body>
+
+<h2>Loan Request</h2>
+
+<form id="loanForm">
+  <input name="name" placeholder="Name" required><br/><br/>
+  <input name="address" placeholder="Address" required><br/><br/>
+  <select name="gender">
+    <option>Male</option>
+    <option>Female</option>
+  </select><br/><br/>
+  <input name="amount" placeholder="Amount" required><br/><br/>
+  <button type="submit">Submit</button>
+</form>
+
+<p id="loanId"></p>
+
+<div id="toast"></div>
+
+<script>
+const form = document.getElementById("loanForm");
+const toast = document.getElementById("toast");
+const loanIdEl = document.getElementById("loanId");
+
+form.onsubmit = async (e) => {
+  e.preventDefault();
+
+  const response = await fetch("/submit", {
+    method: "POST",
+    body: new FormData(form)
+  });
+
+  const data = await response.json();
+
+  // Show loan ID immediately
+  loanIdEl.innerText = `Loan ID: ${data.id}`;
+
+  // Open SSE connection for THIS loan only
+  const eventSource = new EventSource(`/events/${data.id}`);
+
+  eventSource.onmessage = (event) => {
+    const msg = JSON.parse(event.data);
+
+    toast.innerText = `Loan ${msg.status.toUpperCase()}`;
+    toast.style.display = "block";
+  };
+};
+</script>
+
+</body>
+</html>
