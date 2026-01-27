@@ -45,3 +45,9 @@ services:
       - redpanda
     ports:
       - "8001:8001"
+
+  admin-dashboard:
+    build: ./admin-dashboard
+    container_name: admin-dashboard
+    ports:
+      - "8002:8000"
