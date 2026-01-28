@@ -1,4 +1,3 @@
-
 version: "3.9"
 
 services:
@@ -51,3 +50,11 @@ services:
     container_name: admin-dashboard
     ports:
       - "8002:8000"
+  console:
+    image: docker.redpanda.com/redpandadata/console:latest
+    ports:
+      - "8080:8080"        # host:container; change host side if you want a different port
+    environment:
+      - KAFKA_BROKERS=redpanda:9092  # adjust to your broker service/port
+    depends_on:
+      - redpanda
