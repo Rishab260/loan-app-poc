@@ -17,7 +17,6 @@
       <h3 class="font-medium">Sign in</h3>
       <form id="loginForm" class="space-y-2">
         <input name="user_id" type="number" min="1" placeholder="User ID" required class="w-full border rounded px-3 py-2" />
-        <input name="username" placeholder="Username" required class="w-full border rounded px-3 py-2" />
         <input name="password" type="password" placeholder="Password" required class="w-full border rounded px-3 py-2" />
         <div class="flex gap-2">
           <button id="loginBtn" type="submit" class="flex-1 bg-green-600 text-white py-2 rounded">Sign in</button>
@@ -93,22 +92,6 @@
         required
         class="w-full border rounded px-3 py-2 focus:outline-none focus:ring"
       />
-
-      <input
-        name="address"
-        placeholder="Address"
-        required
-        class="w-full border rounded px-3 py-2 focus:outline-none focus:ring"
-      />
-
-      <select
-        name="gender"
-        required
-        class="w-full border rounded px-3 py-2 focus:outline-none focus:ring"
-      >
-        <option value="male">Male</option>
-        <option value="female">Female</option>
-      </select>
 
       <button
         type="submit"
@@ -227,11 +210,11 @@ function onLoginSuccess(user) {
   purposeStep.classList.remove('hidden');
   form.classList.add('hidden');
   resetLoanTypeSelection();
-  const label = user.username ? `${user.username} (ID ${user.user_id})` : `User ${user.user_id}`;
+  const label = user.name ? `${user.name} (ID ${user.user_id})` : `User ID ${user.user_id}`;
   usernameDisplay.innerText = `Signed in as ${label}`;
   if (loanUserIdInput) loanUserIdInput.value = user.user_id || '';
   if (loginUserIdInput) loginUserIdInput.value = user.user_id || '';
-  if (loanNameInput) loanNameInput.value = user.username || '';
+  if (loanNameInput) loanNameInput.value = user.name || '';
 }
 
 function resetLoanTypeSelection() {

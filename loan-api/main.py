@@ -19,7 +19,7 @@ async def lifespan(app: FastAPI):
     for _ in range(10):
         try:
             await broker.start()
-            break
+            breakr
         except Exception:
             await asyncio.sleep(2)
     yield
@@ -83,18 +83,16 @@ async def submit(request: Request, user: Dict[str, Any] = Depends(get_current_us
 
 
 @app.post("/login")
-async def login(response: Response, user_id: str = Form(...), username: str = Form(...), password: str = Form(...)):
+async def login(response: Response, user_id: str = Form(...), password: str = Form(...)):
     user_key = f"user:{user_id}"
     user = await redis_client.get(user_key)
     if user:
         user_obj = json.loads(user)
         if user_obj.get("password") != password:
             raise HTTPException(status_code=401, detail="Invalid credentials")
-        user_obj.setdefault("username", username)
-        await redis_client.set(user_key, json.dumps(user_obj))
     else:
         # create user (simple demo registration)
-        user_obj = {"user_id": user_id, "username": username, "password": password}
+        user_obj = {"user_id": user_id, "password": password}
         await redis_client.set(user_key, json.dumps(user_obj))
 
     token = str(uuid.uuid4())
@@ -103,7 +101,6 @@ async def login(response: Response, user_id: str = Form(...), username: str = Fo
     response.set_cookie("session_token", token, max_age=3600, path="/", httponly=True)
     user_obj.pop("password", None)
     user_obj["user_id"] = user_id
-    user_obj.setdefault("username", username)
     return user_obj
 
 
