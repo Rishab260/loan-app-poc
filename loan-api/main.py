@@ -19,7 +19,7 @@ async def lifespan(app: FastAPI):
     for _ in range(10):
         try:
             await broker.start()
-            breakr
+            break
         except Exception:
             await asyncio.sleep(2)
     yield
