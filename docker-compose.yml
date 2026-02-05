@@ -1,25 +1,4 @@
 services:
-  redpanda:
-    image: redpandadata/redpanda:latest
-    container_name: redpanda
-    command:
-      - redpanda
-      - start
-      - --overprovisioned
-      - --smp
-      - "1"
-      - --memory
-      - "1G"
-      - --node-id
-      - "0"
-      - --check=false
-      - --kafka-addr
-      - PLAINTEXT://0.0.0.0:9092
-      - --advertise-kafka-addr
-      - PLAINTEXT://redpanda:9092
-    ports:
-      - "9092:9092"
-
   redis:
     image: redis:7
     container_name: redis
@@ -30,29 +9,32 @@ services:
     build: ./loan-api
     container_name: loan-api
     depends_on:
-      - redpanda
       - redis
     ports:
       - "8000:8000"
+    environment:
+      - AWS_REGION=${AWS_REGION}
+      - AWS_ACCESS_KEY_ID=${AWS_ACCESS_KEY_ID}
+      - AWS_SECRET_ACCESS_KEY=${AWS_SECRET_ACCESS_KEY}
+      - AWS_SESSION_TOKEN=${AWS_SESSION_TOKEN}
+      - LOAN_SUBMITTED_STREAM=${LOAN_SUBMITTED_STREAM:-loan_submitted}
+      - LOAN_STATUS_STREAM=${LOAN_STATUS_STREAM:-loan_status}
 
   approver:
     build: ./approver
     container_name: approver
-    depends_on:
-      - redpanda
     ports:
       - "8001:8001"
+    environment:
+      - AWS_REGION=${AWS_REGION}
+      - AWS_ACCESS_KEY_ID=${AWS_ACCESS_KEY_ID}
+      - AWS_SECRET_ACCESS_KEY=${AWS_SECRET_ACCESS_KEY}
+      - AWS_SESSION_TOKEN=${AWS_SESSION_TOKEN}
+      - LOAN_SUBMITTED_STREAM=${LOAN_SUBMITTED_STREAM:-loan_submitted}
+      - LOAN_STATUS_STREAM=${LOAN_STATUS_STREAM:-loan_status}
 
   admin-dashboard:
     build: ./admin-dashboard
     container_name: admin-dashboard
     ports:
       - "8002:8000"
-  console:
-    image: docker.redpanda.com/redpandadata/console:latest
-    ports:
-      - "8080:8080"        # host:container; change host side if you want a different port
-    environment:
-      - KAFKA_BROKERS=redpanda:9092  # adjust to your broker service/port
-    depends_on:
-      - redpanda

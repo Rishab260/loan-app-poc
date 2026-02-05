@@ -1,32 +1,155 @@
+"""
+Create a .env file in parent directory with:
+
+# AWS credentials for local docker compose
+AWS_REGION=us-east-1
+AWS_ACCESS_KEY_ID=....
+AWS_SECRET_ACCESS_KEY=....
+
+# Kinesis stream names (override if you used suffixes)
+LOAN_SUBMITTED_STREAM=loan_submitted
+LOAN_STATUS_STREAM=loan_status
+"""
+
 
 import asyncio
 import uuid
 import json
-from contextlib import asynccontextmanager
-from typing import Any, Dict
+import os
+from contextlib import asynccontextmanager, suppress
+from typing import Any, Dict, List, Optional
 
+import boto3
 import httpx
+from botocore.exceptions import ClientError
 from fastapi import FastAPI, Request, Response, Cookie, Form, HTTPException, Depends, status
 from fastapi.responses import HTMLResponse, StreamingResponse
-from faststream.kafka import KafkaBroker
-from faststream import FastStream
 from redis_client import redis_client
 
-broker = KafkaBroker("redpanda:9092")
+LOAN_SUBMITTED_STREAM = os.getenv("LOAN_SUBMITTED_STREAM", "loan_submitted")
+LOAN_STATUS_STREAM = os.getenv("LOAN_STATUS_STREAM", "loan_status")
+AWS_REGION = os.getenv("AWS_REGION")
+
+if not AWS_REGION:
+    raise RuntimeError("AWS_REGION is required for Kinesis usage")
+
+
+def kinesis_client():
+    return boto3.client("kinesis", region_name=AWS_REGION)
+
+
+async def put_record(stream_name: str, payload: Dict[str, Any], partition_key: str) -> None:
+    data = json.dumps(payload).encode()
+    await asyncio.to_thread(
+        kinesis_client().put_record,
+        StreamName=stream_name,
+        Data=data,
+        PartitionKey=partition_key,
+    )
+
+
+async def get_shard_iterators(stream_name: str) -> List[str]:
+    client = kinesis_client()
+    shards = await asyncio.to_thread(client.list_shards, StreamName=stream_name)
+    iterators: List[str] = []
+    for shard in shards.get("Shards", []):
+        shard_id = shard["ShardId"]
+        it_resp = await asyncio.to_thread(
+            client.get_shard_iterator,
+            StreamName=stream_name,
+            ShardId=shard_id,
+            ShardIteratorType="TRIM_HORIZON",
+        )
+        iterator = it_resp.get("ShardIterator")
+        if iterator:
+            iterators.append(iterator)
+    return iterators
+
+
+async def consume_status_stream(stop_event: asyncio.Event):
+    iterators = await get_shard_iterators(LOAN_STATUS_STREAM)
+    while not stop_event.is_set():
+        if not iterators:
+            await asyncio.sleep(2)
+            iterators = await get_shard_iterators(LOAN_STATUS_STREAM)
+            continue
+        next_iterators: List[str] = []
+        for iterator in iterators:
+            if stop_event.is_set():
+                break
+            try:
+                resp = await asyncio.to_thread(
+                    kinesis_client().get_records, ShardIterator=iterator, Limit=25
+                )
+            except ClientError as e:
+                code = e.response.get("Error", {}).get("Code")
+                if code in {"ExpiredIteratorException", "ProvisionedThroughputExceededException"}:
+                    continue
+                print(f"[WARN] Kinesis get_records failed: {e}")
+                continue
+
+            for record in resp.get("Records", []):
+                try:
+                    message = json.loads(record.get("Data", b"{}"))
+                except Exception:
+                    continue
+                await handle_status_message(message)
+
+            next_it = resp.get("NextShardIterator")
+            if next_it:
+                next_iterators.append(next_it)
+        iterators = next_iterators
+        await asyncio.sleep(1)
+
+
+async def handle_status_message(message: Dict[str, Any]) -> None:
+    if not isinstance(message, dict) or "id" not in message:
+        return
+    channel = f"loan_status:{message['id']}"
+    await redis_client.publish(channel, json.dumps(message))
+    if message.get("status") == "approved":
+        try:
+            cached = await redis_client.get(f"loan:{message['id']}")
+            if cached:
+                loan_data = json.loads(cached)
+                opted = loan_data.get("loan_type")
+                user_id = loan_data.get("user_id") or loan_data.get("UserID")
+                name = loan_data.get("name")
+                address = loan_data.get("address")
+                loan_amount = loan_data.get("amount")
+                if opted and user_id:
+                    async with httpx.AsyncClient() as client:
+                        resp = await client.post(
+                            "http://admin-dashboard:8000/opt-by-id",
+                            data={
+                                "user_id": user_id,
+                                "opted": opted,
+                                "name": name or "",
+                                "address": address or "",
+                                "loan_amount": loan_amount or 0,
+                            },
+                            timeout=5.0,
+                        )
+                        if resp.status_code >= 400:
+                            print(f"[WARN] Admin update failed: {resp.status_code} {resp.text}")
+        except Exception as e:
+            print(f"[WARN] Failed to sync admin opted status: {e}")
+
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    for _ in range(10):
-        try:
-            await broker.start()
-            break
-        except Exception:
-            await asyncio.sleep(2)
-    yield
-    await broker.close()
+    stop_event = asyncio.Event()
+    consumer_task: Optional[asyncio.Task] = asyncio.create_task(consume_status_stream(stop_event))
+    try:
+        yield
+    finally:
+        stop_event.set()
+        if consumer_task:
+            consumer_task.cancel()
+            with suppress(asyncio.CancelledError):
+                await consumer_task
 
 app = FastAPI(lifespan=lifespan)
-stream = FastStream(broker)
 
 @app.get("/", response_class=HTMLResponse)
 async def index():
@@ -74,10 +197,10 @@ async def submit(request: Request, user: Dict[str, Any] = Depends(get_current_us
     except Exception as e:
         print(f"[WARN] Failed to cache loan data: {e}")
     try:
-        result = await broker.publish(json.dumps(data), topic="loan.requests")
-        print(f"[DEBUG] Published to Kafka: {data}, result: {result}")
+        await put_record(LOAN_SUBMITTED_STREAM, data, partition_key=loan_id)
+        print(f"[DEBUG] Published to Kinesis: {data}")
     except Exception as e:
-        print(f"[ERROR] Failed to publish to Kafka: {e}")
+        print(f"[ERROR] Failed to publish to Kinesis: {e}")
         return {"error": str(e)}
     return {"id": loan_id}
 
@@ -111,38 +234,6 @@ async def logout(response: Response, session_token: str = Cookie(None)):
     response.delete_cookie("session_token", path="/")
     return {"logged_out": True}
 
-
-@broker.subscriber("loan.status")
-async def status_consumer(message: dict):
-    channel = f"loan_status:{message['id']}"
-    await redis_client.publish(channel, json.dumps(message))
-    if message.get("status") == "approved":
-        try:
-            cached = await redis_client.get(f"loan:{message['id']}")
-            if cached:
-                loan_data = json.loads(cached)
-                opted = loan_data.get("loan_type")
-                user_id = loan_data.get("user_id") or loan_data.get("UserID")
-                name = loan_data.get("name")
-                address = loan_data.get("address")
-                loan_amount = loan_data.get("amount")
-                if opted and user_id:
-                    async with httpx.AsyncClient() as client:
-                        resp = await client.post(
-                            "http://admin-dashboard:8000/opt-by-id",
-                            data={
-                                "user_id": user_id,
-                                "opted": opted,
-                                "name": name or "",
-                                "address": address or "",
-                                "loan_amount": loan_amount or 0,
-                            },
-                            timeout=5.0,
-                        )
-                        if resp.status_code >= 400:
-                            print(f"[WARN] Admin update failed: {resp.status_code} {resp.text}")
-        except Exception as e:
-            print(f"[WARN] Failed to sync admin opted status: {e}")
 
 @app.get("/events/{loan_id}")
 async def events(loan_id: str):

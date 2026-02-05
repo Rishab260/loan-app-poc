@@ -1,8 +1,8 @@
 
 fastapi
 uvicorn
-faststream[kafka]
 jinja2
 python-multipart
 redis
 httpx
+boto3
