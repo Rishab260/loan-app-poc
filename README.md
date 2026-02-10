@@ -41,6 +41,45 @@ docker compose up --build
 docker compose down
 ```
 
+**End-to-end workflow**
+
+1. Create AWS resources.
+
+```bash
+bash scripts/create_kinesis_streams.sh
+bash scripts/create_dynamodb_table.sh
+```
+
+2. Deploy or update the Lambda and ensure the Kinesis mapping exists.
+
+```bash
+cd lambda
+LOAN_STATUS_STREAM_ARN=arn:aws:kinesis:us-east-1:123456789012:stream/loan_status \
+ADMIN_LOANS_TABLE=admin_loans \
+AWS_REGION=us-east-1 \
+bash deploy.sh
+
+aws lambda list-event-source-mappings --function-name loan_handler
+```
+
+3. Start the local services.
+
+```bash
+docker compose up --build
+```
+
+4. Submit a loan request.
+
+- The `loan-api` service publishes to the `loan_submitted` stream.
+- The `approver` service reads `loan_submitted` and writes decisions to `loan_status`.
+- The Lambda reads `loan_status` and upserts items in DynamoDB.
+- The admin dashboard reads DynamoDB and refreshes via SSE.
+
+5. Verify the flow.
+
+- Check the admin dashboard UI for updated rows.
+- Tail the Lambda logs if needed: `aws logs tail /aws/lambda/loan_handler --since 5m`.
+
 **Run a service directly (example: loan-api)**
 
 ```bash
