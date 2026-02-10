@@ -5,7 +5,8 @@ Small proof-of-concept demonstrating event-driven loan processing using AWS Kine
 **Architecture**
 - `loan-api`: submits loan requests to the `loan_submitted` Kinesis stream and publishes status updates to Redis/admin sync.
 - `approver`: consumes `loan_submitted`, applies approval logic, and writes results to the `loan_status` Kinesis stream.
-- `admin-dashboard`: a lightweight UI that reads `loan_status` (or subscribes to Redis) to display loan decisions.
+- `admin-dashboard`: a lightweight UI that reads DynamoDB and updates via SSE without page reloads.
+- `lambda/loan_status_handler.py`: processes `loan_status` Kinesis records and updates DynamoDB when approved.
 - Kinesis streams used: `loan_submitted`, `loan_status` (optional `STREAM_SUFFIX` appended by scripts).
 
 **Prerequisites**
@@ -24,6 +25,8 @@ Important environment variables used by services:
 - `LOAN_SUBMITTED_STREAM` — name of stream for loan submissions (default `loan_submitted`)
 - `LOAN_STATUS_STREAM` — name of stream for loan decisions (default `loan_status`)
 - `REDIS_URL` — address of Redis used for inter-service notifications (if used)
+- `ADMIN_LOANS_TABLE` — DynamoDB table for admin dashboard (default `admin_loans`)
+- `ADMIN_SEED` — seed demo data in admin dashboard (`true`/`false`)
 
 Run with optional overrides, e.g.: `AWS_REGION=us-east-1 AWS_PROFILE=rishab STREAM_SUFFIX=_dev`.
 

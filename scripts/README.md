@@ -45,3 +45,37 @@ bash scripts/delete_kinesis_streams.sh
 - No server-side encryption or IAM scaffolding is included (by design for POC scope).
 - The script is idempotent: existing streams are left intact and waited on until `ACTIVE`.
  - The delete script skips missing streams and waits until they are fully removed.
+
+# DynamoDB POC Setup
+
+Create the DynamoDB table used by the admin dashboard.
+
+## Table created
+- admin_loans (partition key: `UserID`)
+
+## Create table
+
+```bash
+AWS_REGION=us-west-2 \
+AWS_PROFILE=your-profile \
+ADMIN_LOANS_TABLE=admin_loans \
+bash scripts/create_dynamodb_table.sh
+```
+
+## Delete table (stop billing)
+
+```bash
+AWS_REGION=us-west-2 \
+AWS_PROFILE=your-profile \
+ADMIN_LOANS_TABLE=admin_loans \
+bash scripts/delete_dynamodb_table.sh
+```
+
+Optional overrides:
+
+```bash
+BILLING_MODE=PROVISIONED \
+READ_CAPACITY=5 \
+WRITE_CAPACITY=5 \
+bash scripts/create_dynamodb_table.sh
+```

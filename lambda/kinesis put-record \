@@ -1,0 +1,45 @@
+{
+    "FunctionName": "loan_handler",
+    "FunctionArn": "arn:aws:lambda:us-east-1:875786644800:function:loan_handler",
+    "Runtime": "python3.11",
+    "Role": "arn:aws:iam::875786644800:role/service-role/loan_handler-role-qn23fybp",
+    "Handler": "loan_status_handler.lambda_handler",
+    "CodeSize": 1115,
+    "Description": "",
+    "Timeout": 3,
+    "MemorySize": 128,
+    "LastModified": "2026-02-10T16:20:15.000+0000",
+    "CodeSha256": "Xz+c+eOVwGKNEcOpRNX4BNFWQ8Fl7XFTcq7/H/E6Tjo=",
+    "Version": "$LATEST",
+    "Environment": {
+        "Variables": {
+            "ADMIN_LOANS_TABLE": "admin_loans"
+        }
+    },
+    "TracingConfig": {
+        "Mode": "PassThrough"
+    },
+    "RevisionId": "168f8599-73ba-4caa-8328-eea70cb2d473",
+    "State": "Active",
+    "LastUpdateStatus": "InProgress",
+    "LastUpdateStatusReason": "The function is being created.",
+    "LastUpdateStatusReasonCode": "Creating",
+    "PackageType": "Zip",
+    "Architectures": [
+        "x86_64"
+    ],
+    "EphemeralStorage": {
+        "Size": 512
+    },
+    "SnapStart": {
+        "ApplyOn": "None",
+        "OptimizationStatus": "Off"
+    },
+    "RuntimeVersionConfig": {
+        "RuntimeVersionArn": "arn:aws:lambda:us-east-1::runtime:d66b93d39c62355ef595cacc2d473507280d32dae3ddab0642986a3782101c39"
+    },
+    "LoggingConfig": {
+        "LogFormat": "Text",
+        "LogGroup": "/aws/lambda/loan_handler"
+    }
+}

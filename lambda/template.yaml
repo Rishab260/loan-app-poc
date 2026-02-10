@@ -1,0 +1,50 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Transform: AWS::Serverless-2016-10-31
+Description: Loan status Lambda for DynamoDB admin sync
+
+Parameters:
+  AdminLoansTable:
+    Type: String
+    Default: admin_loans
+  LoanStatusStreamArn:
+    Type: String
+    Description: ARN of the loan_status Kinesis stream
+
+Globals:
+  Function:
+    Runtime: python3.11
+    Timeout: 10
+    MemorySize: 256
+
+Resources:
+  LoanStatusHandler:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: .
+      Handler: loan_status_handler.lambda_handler
+      Environment:
+        Variables:
+          AWS_REGION: !Ref AWS::Region
+          ADMIN_LOANS_TABLE: !Ref AdminLoansTable
+      Policies:
+        - DynamoDBCrudPolicy:
+            TableName: !Ref AdminLoansTable
+        - KinesisStreamReadPolicy:
+            StreamName: !Select
+              - 1
+              - !Split
+                - "/"
+                - !Ref LoanStatusStreamArn
+      Events:
+        LoanStatusStream:
+          Type: Kinesis
+          Properties:
+            Stream: !Ref LoanStatusStreamArn
+            StartingPosition: TRIM_HORIZON
+            BatchSize: 100
+            Enabled: true
+
+Outputs:
+  LoanStatusHandlerArn:
+    Description: Lambda function ARN
+    Value: !GetAtt LoanStatusHandler.Arn

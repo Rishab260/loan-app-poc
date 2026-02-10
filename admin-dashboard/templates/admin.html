@@ -24,22 +24,26 @@
               <th class="px-3 py-2 text-left border-b">Address</th>
               <th class="px-3 py-2 text-left border-b">Loan Amount</th>
               <th class="px-3 py-2 text-left border-b">Opted</th>
+              <th class="px-3 py-2 text-left border-b">Status</th>
               <th class="px-3 py-2 text-left border-b">Actions</th>
             </tr>
           </thead>
-          <tbody>
+          <tbody id="loanTableBody">
             {% for loan in loans %}
             <tr class="odd:bg-white even:bg-gray-50">
-              <td class="px-3 py-2 border-b">{{ loan.user_id }}</td>
-              <td class="px-3 py-2 border-b">{{ loan.name }}</td>
-              <td class="px-3 py-2 border-b">{{ loan.address }}</td>
-              <td class="px-3 py-2 border-b">${{ '%.2f'|format(loan.loan_amount) }}</td>
+              <td class="px-3 py-2 border-b">{{ loan.UserID }}</td>
+              <td class="px-3 py-2 border-b">{{ loan.Name }}</td>
+              <td class="px-3 py-2 border-b">{{ loan.Address }}</td>
+              <td class="px-3 py-2 border-b">${{ '%.2f'|format(loan.LoanAmount) }}</td>
               <td class="px-3 py-2 border-b">
-                {% if loan.opted %}
-                  <span class="px-2 py-1 rounded-full text-xs font-semibold bg-blue-50 text-blue-700">{{ loan.opted }}</span>
+                {% if loan.Opted %}
+                  <span class="px-2 py-1 rounded-full text-xs font-semibold bg-blue-50 text-blue-700">{{ loan.Opted }}</span>
                 {% else %}
                   <span class="text-gray-500">NULL</span>
                 {% endif %}
+              </td>
+              <td class="px-3 py-2 border-b">
+                <span class="px-2 py-1 rounded-full text-xs font-semibold bg-gray-100 text-gray-700">{{ loan.Status or 'pending' }}</span>
               </td>
               <td class="px-3 py-2 border-b">
                 <div class="flex gap-2">
@@ -63,5 +67,62 @@
       </div>
     </div>
   </div>
+
+  <script>
+    const tableBody = document.getElementById("loanTableBody");
+
+    function statusBadge(status) {
+      const base = "px-2 py-1 rounded-full text-xs font-semibold";
+      if (status === "approved") return `${base} bg-green-50 text-green-700`;
+      if (status === "denied") return `${base} bg-red-50 text-red-700`;
+      return `${base} bg-gray-100 text-gray-700`;
+    }
+
+    function optedBadge(opted) {
+      if (!opted) return `<span class="text-gray-500">NULL</span>`;
+      return `<span class="px-2 py-1 rounded-full text-xs font-semibold bg-blue-50 text-blue-700">${opted}</span>`;
+    }
+
+    function renderLoans(loans) {
+      tableBody.innerHTML = "";
+      loans.forEach((loan) => {
+        const row = document.createElement("tr");
+        row.className = "odd:bg-white even:bg-gray-50";
+        row.innerHTML = `
+          <td class="px-3 py-2 border-b">${loan.UserID}</td>
+          <td class="px-3 py-2 border-b">${loan.Name || ""}</td>
+          <td class="px-3 py-2 border-b">${loan.Address || ""}</td>
+          <td class="px-3 py-2 border-b">$${Number(loan.LoanAmount || 0).toFixed(2)}</td>
+          <td class="px-3 py-2 border-b">${optedBadge(loan.Opted)}</td>
+          <td class="px-3 py-2 border-b"><span class="${statusBadge(loan.Status || "pending")}">${loan.Status || "pending"}</span></td>
+          <td class="px-3 py-2 border-b">
+            <div class="flex gap-2">
+              <form method="post" action="/reset/${loan.UserID}">
+                <button class="bg-gray-200 text-gray-700 px-3 py-1 rounded hover:bg-gray-300">Reset</button>
+              </form>
+            </div>
+          </td>
+        `;
+        tableBody.appendChild(row);
+      });
+    }
+
+    async function refreshLoans() {
+      const res = await fetch("/api/loans");
+      if (!res.ok) return;
+      const data = await res.json();
+      renderLoans(data);
+    }
+
+    refreshLoans();
+
+    const eventSource = new EventSource("/events");
+    eventSource.onmessage = () => refreshLoans();
+    eventSource.onerror = () => {
+      setTimeout(() => {
+        refreshLoans();
+      }, 3000);
+    };
+  </script>
 </body>
 </html>

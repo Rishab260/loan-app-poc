@@ -97,7 +97,16 @@ async def auto_approve(message: Any):
 
     loan_id = payload.get("id")
     if loan_id:
-        await put_record(LOAN_STATUS_STREAM, {"id": loan_id, "status": "approved"}, partition_key=str(loan_id))
+        status_payload = {
+            "id": loan_id,
+            "status": "approved",
+            "user_id": payload.get("user_id"),
+            "loan_type": payload.get("loan_type"),
+            "name": payload.get("name"),
+            "address": payload.get("address"),
+            "amount": payload.get("amount"),
+        }
+        await put_record(LOAN_STATUS_STREAM, status_payload, partition_key=str(loan_id))
 
 
 @asynccontextmanager

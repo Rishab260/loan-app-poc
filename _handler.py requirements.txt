@@ -1,0 +1,26 @@
+{
+    "EventSourceMappings": [
+        {
+            "UUID": "bb3227cd-1c85-4caf-8430-14d4869623f8",
+            "StartingPosition": "TRIM_HORIZON",
+            "BatchSize": 100,
+            "MaximumBatchingWindowInSeconds": 0,
+            "ParallelizationFactor": 1,
+            "EventSourceArn": "arn:aws:kinesis:us-east-1:875786644800:stream/loan_status",
+            "FunctionArn": "arn:aws:lambda:us-east-1:875786644800:function:loan_handler",
+            "LastModified": "2026-02-10T21:42:00+05:30",
+            "LastProcessingResult": "No records processed",
+            "State": "Enabled",
+            "StateTransitionReason": "User action",
+            "DestinationConfig": {
+                "OnFailure": {}
+            },
+            "MaximumRecordAgeInSeconds": -1,
+            "BisectBatchOnFunctionError": false,
+            "MaximumRetryAttempts": -1,
+            "TumblingWindowInSeconds": 0,
+            "FunctionResponseTypes": [],
+            "EventSourceMappingArn": "arn:aws:lambda:us-east-1:875786644800:event-source-mapping:bb3227cd-1c85-4caf-8430-14d4869623f8"
+        }
+    ]
+}
